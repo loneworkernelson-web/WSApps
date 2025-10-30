@@ -51,7 +51,12 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
     </div>
 
 <header class="flex justify-between items-center mb-4 relative z-10 flex-shrink-0">
-<h1 class="text-2xl font-bold text-blue-400">Workplace Support App</h1>
+    <!-- === UPDATED HEADER TO INCLUDE LOGO === -->
+    <div class="flex items-center">
+        <img src="https://i.postimg.cc/pd5PQJY9/favicon-logo-for-LWS.png" alt="Logo" class="h-8 w-8 mr-3 rounded" onerror="this.style.display='none'"> 
+        <h1 class="text-2xl font-bold text-blue-400">Workplace Support App</h1>
+    </div>
+    <!-- === END UPDATED HEADER === -->
 <div class="flex items-center space-x-1">
 <button type="button" id="infoBtn" class="p-3 rounded-full hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-info"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></button>
 <button type="button" id="settingsBtn" class="p-3 rounded-full hover:bg-gray-700"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2.82l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2.82l.15.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -276,12 +281,13 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
     };
     const DURATION_STEPS = [0, 10, 15, 20, 30, 45, 60, 75, 90, 105, 120, 150, 180, 240, 300];
     
-    // --- WSA: Standard Checklist ---
+    // --- WSA: Standard Checklist (Updated to object format) ---
     const STANDARD_CHECKLIST = [
-        "Safety check completed",
-        "Client goals reviewed",
-        "Next appointment scheduled",
-        "Visit notes recorded"
+        { type: "header", text: "Standard Visit" },
+        { type: "checkbox", text: "Safety check completed" },
+        { type: "checkbox", text: "Client goals reviewed" },
+        { type: "checkbox", text: "Next appointment scheduled" },
+        { type: "checkbox", text: "Visit notes recorded" }
     ];
     
     // --- TEMPLATE PLACEHOLDERS ---
@@ -365,10 +371,10 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
     function hideModals() { modals.backdrop.classList.add('hidden'); modals.backdrop.classList.remove('flex'); }
     function showAlert(title, message) { document.getElementById('alertModalTitle').textContent = title; document.getElementById('alertModalMessage').textContent = message; showModal('alert'); }
     
-    // --- UPDATED loadState ---
+    // --- UPDATED loadState (WSA v1.1 FIX) ---
     function loadState() { 
         const savedState = JSON.parse(localStorage.getItem('loneWorkerState')); 
-        // --- WSA: Initialize new state properties ---
+        
         const defaultState = {
             settings: { workerName: '', workerPhone: '', emergencyName: '', emergencyPhone: '', emergencyEmail: '', escalationName: '', escalationPhone: '', escalationEmail: '', pinCode: '', duressPin: '', googleSheetUrl: '' }, 
             locations: [], 
@@ -378,7 +384,27 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
             cachedForms: {},
             pendingUploads: []
         };
+        
+        // Merge saved state onto default state
         state = { ...defaultState, ...savedState };
+        // Deep merge settings object
+        state.settings = { ...defaultState.settings, ...(savedState ? savedState.settings : {}) };
+
+        // --- ROBUSTNESS FIX: Ensure arrays/objects are correct type ---
+        if (!Array.isArray(state.locations)) {
+            console.warn("Locations in localStorage was not an array, resetting.");
+            state.locations = [];
+        }
+        if (!Array.isArray(state.pendingUploads)) {
+             console.warn("PendingUploads in localStorage was not an array, resetting.");
+            state.pendingUploads = [];
+        }
+        if (typeof state.cachedForms !== 'object' || state.cachedForms === null || Array.isArray(state.cachedForms)) {
+             console.warn("CachedForms in localStorage was not an object, resetting.");
+            state.cachedForms = {};
+        }
+        // --- END FIX ---
+        
         // Ensure locations array elements have new properties
         state.locations = state.locations.map(loc => ({
             ...loc,
@@ -391,34 +417,32 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
             state.activeVisit.anticipatedDepartureTime = new Date(savedState.activeVisit.anticipatedDepartureTime); 
         } 
         
-        // --- BUG FIX: Create Travelling location with full properties ---
         const travellingExists = state.locations.some(loc => loc.id === 'loc_travelling_default'); 
         if (!travellingExists) { 
             state.locations.push({ 
                 id: 'loc_travelling_default', 
                 name: 'Travelling', 
                 address: 'GPS updates will be sent every 15 minutes.',
-                companyName: 'Internal', // Add default company
-                useCustomForm: false // Add default form flag
+                companyName: 'Internal', 
+                useCustomForm: false 
             }); 
-            saveState(); 
+            // Note: saveState() is not called here, will be called after URL prefill
         } 
-        // --- END BUG FIX ---
         
-        const prefilledUrl = "https://script.google.com/macros/s/AKfycbzUckX4sAy15mOS-x-eG4MTISdaugAPOQb2OVfTfRMOM7uwDI38Uusq-MZC-cKXcgrahg/exec";
+        const prefilledUrl = "https://script.google.com/macros/s/AKfycbwS1ATGpQhvDAjiaUhemNB3-kM0EWn6OaLowNB5NFFA3xfM0LaTrLBZyYdTH71gn0Qt/exec";
         if (prefilledUrl.startsWith('http') && !state.settings.googleSheetUrl) {
             state.settings.googleSheetUrl = prefilledUrl;
-            saveState();
         }
+        saveState(); // Save state once after all initialization
     }
+    // --- END UPDATED loadState ---
+
     function saveState() { localStorage.setItem('loneWorkerState', JSON.stringify(state)); }
     
-    // --- UPDATED renderLocations ---
     function renderLocations() {
         locationList.innerHTML = ''; if (state.locations.length === 0) { locationList.innerHTML = `<p class="text-gray-500 text-center">No locations added yet.</p>`; }
         state.locations.sort((a,b) => a.name.localeCompare(b.name)).forEach(loc => { 
             const isSelected = loc.id === state.selectedLocationId; 
-            // --- WSA: Show company name in location list ---
             const companyHtml = loc.companyName ? `<p class="text-sm text-blue-400">${loc.companyName}${loc.useCustomForm ? ' (Custom Form)' : ''}</p>` : '';
             const locationEl = document.createElement('div'); 
             locationEl.className = `selectable-item p-3 rounded-lg cursor-pointer border-2 transition-transform duration-100 ${isSelected ? 'bg-blue-900/50 border-blue-500' : 'bg-gray-800 border-transparent hover:border-gray-600'}`; 
@@ -446,7 +470,6 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
         } 
     }
     
-    // --- UPDATED sendToGoogleSheet (WSA Offline Queue) ---
     function sendToGoogleSheet(data, isRetry = false) {
         if (!state.settings.googleSheetUrl || !state.settings.googleSheetUrl.startsWith('http')) {
             console.error("Google Sheet URL is not set.");
@@ -471,7 +494,6 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
             formData.append(key, payload[key]);
         }
 
-        // Return a promise to know if it succeeded or failed
         return fetch(state.settings.googleSheetUrl, {
             method: 'POST',
             mode: 'no-cors',
@@ -481,7 +503,6 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
             return Promise.resolve(); // Success
         }).catch(error => {
             console.error('Error sending data to Google Sheet:', error);
-            // If it's not a retry and it's a DEPART/REPORT, queue it.
             if (!isRetry && data["Alarm Status"] === 'DEPARTED') {
                 console.log("Network failed. Queuing report.");
                 state.pendingUploads.push(payload); 
@@ -493,7 +514,6 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
             return Promise.reject(error); // Failure
         });
     }
-    // --- END UPDATED sendToGoogleSheet ---
 
     function withPinVerification(callback, isDuressAction = false) {
         if (!state.settings.pinCode) { showAlert("PIN Not Set", "Please set a PIN in settings."); return; }
@@ -534,7 +554,6 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
     let visitInterval;
     function handleArriveLongPress() { playSoundAndVibrate('arrive'); attemptStartVisit(); }
     
-    // --- UPDATED handleDepartLongPress (WSA) ---
     function handleDepartLongPress() {
         playSoundAndVibrate('depart');
         showReportModal();
@@ -672,7 +691,6 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
         document.getElementById('lockedAnticipatedTime').textContent = new Date(state.activeVisit.anticipatedDepartureTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit'});
     }
     
-    // --- UPDATED depart (WSA) ---
     function depart(reportData = {}) {
         if (!state.activeVisit) return; 
         const now = new Date();
@@ -946,15 +964,18 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
         reportNotes.value = ''; // Clear notes
         reportFormChecklists.innerHTML = ''; // Clear old checklist
 
-        let checklistQuestions = STANDARD_CHECKLIST; // Default to standard
+        let checklistItems = STANDARD_CHECKLIST; // Default to standard (which is now array of objects)
 
-        if (location.useCustomForm) {
+        if (location.useCustomForm && location.companyName) {
             // Try to get form from cache
             const cachedForm = state.cachedForms[location.companyName];
-            if (cachedForm && cachedForm.length > 0) {
+            if (cachedForm && Array.isArray(cachedForm) && cachedForm.length > 0) {
                 console.log("Using cached custom form for", location.companyName);
-                checklistQuestions = cachedForm;
-                buildReportForm(checklistQuestions);
+                checklistItems = cachedForm; // Use the cached array of objects
+                buildReportForm(checklistItems);
+            } else if (cachedForm) { // It's cached but empty, meaning no custom form exists
+                 console.log("Using standard form (custom form was empty in cache).");
+                 buildReportForm(checklistItems); // Use standard
             } else {
                 // If not in cache, show error (we don't fetch on depart, only on sync)
                 console.warn("Custom form not in cache for", location.companyName);
@@ -964,20 +985,27 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
         } else {
             // Use standard form
             console.log("Using standard form.");
-            buildReportForm(checklistQuestions);
+            buildReportForm(checklistItems);
         }
     }
     
     /**
-     * Helper to build the checklist HTML from an array of questions.
+     * Helper to build the checklist HTML from an array of objects.
      */
-    function buildReportForm(questions) {
-         reportFormChecklists.innerHTML = questions.map((q, index) => `
-            <label for="check-${index}" class="flex items-center p-2 bg-gray-900 rounded-md cursor-pointer">
-                <input id="check-${index}" name="${q}" type="checkbox" class="h-5 w-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500">
-                <span class="ml-3 text-gray-300">${q}</span>
-            </label>
-        `).join('');
+    // --- UPDATED buildReportForm (WSA v1.2) ---
+    function buildReportForm(items) {
+         reportFormChecklists.innerHTML = items.map((item, index) => {
+            if (item.type === 'header') {
+                // Render a header
+                return `<h3 class="text-lg font-semibold text-blue-300 mt-4 mb-2">${item.text}</h3>`;
+            } else { // Default to checkbox
+                // Render a checkbox
+                return `<label for="check-${index}" class="flex items-center p-2 bg-gray-900 rounded-md cursor-pointer">
+                    <input id="check-${index}" name="${item.text}" type="checkbox" class="h-5 w-5 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500">
+                    <span class="ml-3 text-gray-300">${item.text}</span>
+                </label>`;
+            }
+         }).join('');
         reportFormContainer.classList.remove('hidden');
         submitReportBtn.disabled = false;
     }
@@ -985,14 +1013,16 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
     /**
      * Gathers report data and calls depart()
      */
+    // --- UPDATED submitReport (WSA v1.2) ---
     function submitReport() {
+        if (!state.activeVisit) return; // Check again in case
         const location = state.locations.find(l => l.id === state.activeVisit.locationId);
         
-        // Gather checklist data
+        // --- UPDATED: Gather all checklist data (true/false) ---
         const checklistData = {};
         const checkboxes = reportFormChecklists.querySelectorAll('input[type="checkbox"]');
         checkboxes.forEach(cb => {
-            checklistData[cb.name] = cb.checked;
+            checklistData[cb.name] = cb.checked; // Store true OR false
         });
 
         // Gather notes
@@ -1015,8 +1045,9 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
      * Fetches a single custom form from the backend (if not in cache).
      */
     async function fetchForm(companyName) {
-         if (!companyName || state.cachedForms[companyName] || !navigator.onLine) {
-             return; // Don't fetch if no name, already cached, or offline
+         if (!companyName || state.cachedForms[companyName] !== undefined || !navigator.onLine) {
+             // Do not fetch if no name, already cached (even as empty []), or offline
+             return; 
          }
          console.log(`Fetching custom form for: ${companyName}`);
          try {
@@ -1029,18 +1060,18 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
                  throw new Error(`Server responded with ${response.status}`);
              }
              const questions = await response.json();
-             if (questions && questions.length > 0) {
+             if (questions && Array.isArray(questions)) { // Check if it's an array
                  console.log(`Successfully fetched and cached form for ${companyName}`);
-                 state.cachedForms[companyName] = questions;
+                 state.cachedForms[companyName] = questions; // Cache result (even if empty [])
                  saveState();
              } else {
                  console.warn(`No custom form found in sheet for ${companyName}`);
-                 // Cache empty result to prevent re-fetching
-                 state.cachedForms[companyName] = []; 
+                 state.cachedForms[companyName] = []; // Cache empty result
                  saveState();
              }
          } catch (error) {
              console.error(`Failed to fetch form for ${companyName}:`, error);
+             // Do not cache error, allow retry on next load
          }
     }
 
@@ -1048,11 +1079,10 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
      * Loops through all locations and proactively fetches/caches custom forms.
      */
     async function syncCustomForms() {
-         if (isSyncing || !navigator.onLine) return;
+         if (isSyncing || !navigator.onLine || !state.settings.googleSheetUrl) return;
          isSyncing = true;
          console.log("Starting custom form sync...");
          
-         // Create a unique list of companies that use custom forms
          const companiesToSync = [...new Set(
              state.locations
                  .filter(loc => loc.useCustomForm && loc.companyName)
@@ -1060,8 +1090,7 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
          )];
 
          for (const companyName of companiesToSync) {
-             // Fetch only if not already in cache
-             if (state.cachedForms[companyName] === undefined) { // Check for undefined, allows re-fetching empty [] if needed
+             if (state.cachedForms[companyName] === undefined) { 
                  await fetchForm(companyName);
              }
          }
@@ -1073,8 +1102,8 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
      * Tries to upload any pending reports from the offline queue.
      */
     async function processUploadQueue() {
-        if (isSyncing || !navigator.onLine || state.pendingUploads.length === 0) {
-            return; // Don't run if busy, offline, or queue is empty
+        if (isSyncing || !navigator.onLine || state.pendingUploads.length === 0 || !state.settings.googleSheetUrl) {
+            return; 
         }
         isSyncing = true;
         uploadQueueBanner.classList.remove('hidden');
@@ -1099,7 +1128,6 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
              uploadQueueBanner.classList.add('hidden');
         } else {
              console.log(`${state.pendingUploads.length} items remain in queue.`);
-             // Hide banner even if some fail, will retry next load
              uploadQueueBanner.classList.add('hidden'); 
         }
     }
@@ -1140,17 +1168,15 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
             });
             saveState();
             showAlert("Success", "Settings have been saved.");
-            navigate('main');
+            navigate('main'); // This will trigger syncs
         });
         addLocationBtn.addEventListener('click', () => {
             showModal('location', () => {
                 document.getElementById('locationModalTitle').textContent = 'Add New Location';
                 document.getElementById('locationName').value = '';
                 document.getElementById('locationAddress').value = '';
-                // --- WSA: Clear new location fields ---
                 document.getElementById('companyName').value = '';
                 document.getElementById('useCustomForm').checked = false;
-                // --- End WSA ---
                 document.getElementById('deleteLocationBtn').classList.add('hidden');
                 document.querySelector('#saveLocationBtn').dataset.id = '';
             });
@@ -1165,10 +1191,8 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
                     document.getElementById('locationModalTitle').textContent = 'Edit Location'; 
                     document.getElementById('locationName').value = location.name; 
                     document.getElementById('locationAddress').value = location.address; 
-                    // --- WSA: Populate new location fields ---
                     document.getElementById('companyName').value = location.companyName || '';
                     document.getElementById('useCustomForm').checked = location.useCustomForm || false;
-                    // --- End WSA ---
                     
                     if (locId === 'loc_travelling_default') {
                         document.getElementById('deleteLocationBtn').classList.add('hidden');
@@ -1195,23 +1219,20 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
             const id = document.querySelector('#saveLocationBtn').dataset.id;
             const name = document.getElementById('locationName').value.trim();
             const address = document.getElementById('locationAddress').value.trim();
-            // --- WSA: Get new location fields ---
             const companyName = document.getElementById('companyName').value.trim();
             const useCustomForm = document.getElementById('useCustomForm').checked;
-            // --- End WSA ---
 
             if (!name || !address) { showAlert("Missing Info", "Please provide both a name and an address for the location."); return; }
             if (id) {
                 const index = state.locations.findIndex(l => l.id === id);
-                 if (index > -1) state.locations[index] = { ...state.locations[index], name, address, companyName, useCustomForm }; // WSA: Save new fields
+                 if (index > -1) state.locations[index] = { ...state.locations[index], name, address, companyName, useCustomForm }; 
             } else {
-                state.locations.push({ id: `loc_${Date.now()}`, name, address, companyName, useCustomForm }); // WSA: Save new fields
+                state.locations.push({ id: `loc_${Date.now()}`, name, address, companyName, useCustomForm }); 
             }
             saveState();
             renderLocations();
             hideModals();
 
-            // --- WSA: If new/edited location uses custom form, fetch it now ---
             if (useCustomForm && companyName) {
                 fetchForm(companyName);
             }
@@ -1363,7 +1384,7 @@ header button svg, .edit-location-btn svg { pointer-events: none; }
             pin: document.getElementById('pinModal'), 
             alert: document.getElementById('alertModal'), 
             checkin: document.getElementById('checkinModal'),
-            report: document.getElementById('reportModal') // --- WSA: Add report modal ---
+            report: document.getElementById('reportModal') 
         };
         locationList = document.getElementById('locationList');
         arrivedBtn = document.getElementById('arrivedBtn');
